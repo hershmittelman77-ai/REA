@@ -39,6 +39,7 @@ import type {
 } from "./BinarySessionPort.js";
 import {
   SessionProviderRouter,
+  sessionRouteCapabilities,
   type SessionProviderRoute,
 } from "./SessionProviderRouter.js";
 import {
@@ -1533,7 +1534,13 @@ export class BinarySession
   }
 
   #currentRoute(): SessionProviderRoute {
-    return this.#active?.route ?? this.#providerRouter.initialRoute();
+    const active = this.#active;
+    return active === undefined
+      ? this.#providerRouter.initialRoute()
+      : {
+          ...active.route,
+          capabilities: sessionRouteCapabilities(active.route, active.client),
+        };
   }
 
   #serialize<T>(
