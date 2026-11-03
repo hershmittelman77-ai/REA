@@ -654,10 +654,7 @@ const readJournal = async (
             "output_directory",
             "Resume requires decompile-journal.jsonl in the output directory. An export stopped before its journal was written has no functions to keep; choose a new output directory, or remove this one if it is yours.",
           )
-        : decompileInputError(
-            "output_directory",
-            "The decompile journal could not be read.",
-          ),
+        : unreadableJournal("The decompile journal could not be read."),
     );
   const parsed = parseJournal(bytes);
   if (!parsed.ok) return parsed;
@@ -802,10 +799,27 @@ const journalIdentityMismatch = (
   );
 };
 
+const unreadableJournal = (message: string): AnalysisInputError =>
+  new AnalysisInputError(
+    "decompile_all",
+    {
+      userMessage: message,
+      conformsToInputContract: true,
+      remediationAction:
+        "Inspect the decompile journal, check its permissions, use the REA version that created it, or select a new output directory. The journal and existing files were left unchanged.",
+    },
+    [
+      {
+        path: ["output_directory"],
+        reason: "invalid_value",
+        message,
+      },
+    ],
+  );
+
 const incompatibleJournal = (): AnalysisInputError =>
-  decompileInputError(
-    "output_directory",
-    "The decompile journal is not a compatible export.",
+  unreadableJournal(
+    "The decompile journal cannot be read and may be damaged or require a different REA version.",
   );
 
 const parseJson = (line: string | undefined): unknown => {
