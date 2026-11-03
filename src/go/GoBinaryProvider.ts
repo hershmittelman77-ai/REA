@@ -12,7 +12,10 @@ import {
   artifactFileCancellationCause,
 } from "../artifacts/ArtifactFileOperation.js";
 import { ArtifactResourceScope } from "../artifacts/ArtifactResourceScope.js";
-import { ArtifactReaderFailure } from "../artifacts/ArtifactReader.js";
+import {
+  ArtifactReaderFailure,
+  selectedPathRefusal,
+} from "../artifacts/ArtifactReader.js";
 import type { ExecutionOptions } from "../application/AnalysisProvider.js";
 import type { GoBinaryPort } from "../application/go/GoBinaryPort.js";
 import { AnalysisError } from "../domain/analysisErrorBase.js";
@@ -113,7 +116,7 @@ const failureForPrimary = (
         },
       );
     if (cause.reason === "path")
-      return new AnalysisInputError(OPERATION, { cause }, [
+      return new AnalysisInputError(OPERATION, selectedPathRefusal(cause), [
         { path: ["path"], reason: "invalid_format", message: cause.message },
       ]);
   }

@@ -1,4 +1,4 @@
-import { lstat, open, writeFile } from "node:fs/promises";
+import { lstat, open, realpath, writeFile } from "node:fs/promises";
 import { constants, type BigIntStats } from "node:fs";
 import { join } from "node:path";
 import { ArtifactReaderFailure } from "../artifacts/ArtifactReader.js";
@@ -24,6 +24,7 @@ import { SQLITE_DATABASE_LIMITS } from "./SqliteDatabaseLimits.js";
 const fileSystem: StableArtifactFileSystem = {
   lstat: (path) => lstat(path, { bigint: true }),
   open,
+  realpath,
 };
 
 type SnapshotMemberRole = "database" | "wal";
@@ -164,15 +165,42 @@ const duringAcquisition = async <T>(
   }
 };
 
+/**
+ * Only the selected database may be reselected through its resolved target.
+ * A derived WAL is not a caller input, so its refusal advises a consistent
+ * regular-file snapshot instead of retrying `path` with the WAL target.
+ */
+const derivedWalRefusal = (
+  cause: unknown,
+  walPath: string,
+  databasePath: string,
+): unknown =>
+  cause instanceof ArtifactReaderFailure &&
+  cause.reason === "path" &&
+  cause.cleanup === undefined &&
+  cause.userMessage === undefined
+    ? new ArtifactReaderFailure("path", cause.message, {
+        cause,
+        userMessage: `The derived SQLite WAL is not a regular file (for example, it is a symlink): ${walPath}. REA does not follow WAL symlinks or accept a WAL as the selected database. Use the application's supported consistent offline export or copy workflow to create a snapshot where ${databasePath} and its WAL are regular files, then select that database.`,
+      })
+    : cause;
+
 const readObservedArtifact = (
+  role: SnapshotMemberRole,
+  databasePath: string,
   path: string,
   observed: BigIntStats,
   maximumBytes: number,
   selectedFileSystem: StableArtifactFileSystem,
   resourceScope: ArtifactResourceScope,
   signal?: AbortSignal,
-) =>
-  duringAcquisition(path, () =>
+) => {
+  // Derived sidecars must not borrow the selected database's retry advice.
+  const resolveTarget =
+    role === "database"
+      ? selectedFileSystem.realpath?.bind(selectedFileSystem)
+      : undefined;
+  const read = duringAcquisition(path, () =>
     readStableArtifact(
       path,
       maximumBytes,
@@ -180,6 +208,8 @@ const readObservedArtifact = (
       {
         open: (selectedPath, flags) =>
           selectedFileSystem.open(selectedPath, flags),
+        // Names a refused symlink's target; test doubles may omit it.
+        ...(resolveTarget === undefined ? {} : { realpath: resolveTarget }),
         lstat: async (selectedPath) => {
           const current = await selectedFileSystem.lstat(selectedPath);
           if (!sameState(observed, current))
@@ -193,6 +223,12 @@ const readObservedArtifact = (
       resourceScope,
     ),
   );
+  return role === "database"
+    ? read
+    : read.catch((cause: unknown) => {
+        throw derivedWalRefusal(cause, path, databasePath);
+      });
+};
 
 const verifyInactiveJournal = async (
   path: string,
@@ -301,6 +337,8 @@ export const captureSqliteDatabaseSnapshot = async (
       return recordMember(
         role,
         await readObservedArtifact(
+          role,
+          path,
           role === "database" ? path : walPath,
           observed,
           maximumBytes,
