@@ -6,6 +6,7 @@ import { z } from "zod";
 import { projectAnalysisError } from "../../../src/domain/analysisErrorProjection.js";
 import { evmInterfaceSchema } from "../../../src/domain/evm/evmInterface.js";
 import { EvmoleInterfaceProvider } from "../../../src/evm/EvmoleInterfaceProvider.js";
+import { evmWorkerRequestSchema } from "../../../src/evm/EvmInterfaceWorkerContract.js";
 import { spawnOwnedProviderProcess } from "../../../src/process/ProviderProcess.js";
 import { cleanupOwnedProcessGroup } from "../../../src/process/ProcessOwnership.js";
 import { waitForProviderProcessReady } from "../../fixtures/providerProcess.js";
@@ -18,12 +19,6 @@ import {
 } from "../../support/workspace/workspaceFixture.js";
 
 const unsupportedHost = process.platform !== "linux" || process.arch !== "x64";
-const requestSchema = z.strictObject({
-  snapshot_path: z.string(),
-  reply_path: z.string(),
-  failure_marker_path: z.string(),
-  encoding: z.enum(["raw", "hex"]),
-});
 const fixture = async () => {
   const workspace = await createTestWorkspace("rea-evm-interface-boundary-");
   onTestFinished(() => removeTestWorkspace(workspace.root));
@@ -217,7 +212,7 @@ it.runIf(!unsupportedHost).each(["completed", "malformed-reply"] as const)(
         ownedRoot = spawn.cwd ?? "";
         const requestPath = spawn.arguments.at(-1);
         if (requestPath === undefined) throw new Error("Request missing");
-        const request = requestSchema.parse(
+        const request = evmWorkerRequestSchema.parse(
           JSON.parse(await readFile(requestPath, "utf8")),
         );
         if (scenario === "malformed-reply")
@@ -331,7 +326,7 @@ it.runIf(!unsupportedHost).each([1048576, 1048577])(
       ownedPath = spawn.cwd ?? "";
       const requestPath = spawn.arguments.at(-1);
       if (requestPath === undefined) throw new Error("Request missing");
-      const request = requestSchema.parse(
+      const request = evmWorkerRequestSchema.parse(
         JSON.parse(await readFile(requestPath, "utf8")),
       );
       const bytes = Buffer.from("60006000f3", "hex");
@@ -400,7 +395,7 @@ it
         expect(spawn.arguments).toContain("--disable-wasm-trap-handler");
         const requestPath = spawn.arguments.at(-1);
         if (requestPath === undefined) throw new Error("request missing");
-        const request = requestSchema.parse(
+        const request = evmWorkerRequestSchema.parse(
           JSON.parse(await readFile(requestPath, "utf8")),
         );
         expect(request.encoding).toBe("hex");
@@ -548,7 +543,7 @@ it.runIf(!unsupportedHost)(
       ownedRoot = spawn.cwd ?? "";
       const requestPath = spawn.arguments.at(-1);
       if (requestPath === undefined) throw new Error("request missing");
-      const request = requestSchema.parse(
+      const request = evmWorkerRequestSchema.parse(
         JSON.parse(await readFile(requestPath, "utf8")),
       );
       const bytes = Buffer.from("60006000f3", "hex");
@@ -774,7 +769,7 @@ it.runIf(!unsupportedHost)(
       async (spawn) => {
         const requestPath = spawn.arguments.at(-1);
         if (requestPath === undefined) throw new Error("request missing");
-        const request = requestSchema.parse(
+        const request = evmWorkerRequestSchema.parse(
           JSON.parse(await readFile(requestPath, "utf8")),
         );
         await writeFile(
@@ -834,7 +829,7 @@ it
       async (spawn) => {
         const requestPath = spawn.arguments.at(-1);
         if (requestPath === undefined) throw new Error("request missing");
-        const request = requestSchema.parse(
+        const request = evmWorkerRequestSchema.parse(
           JSON.parse(await readFile(requestPath, "utf8")),
         );
         const bytes = Buffer.from("60006000f3", "hex");
