@@ -1075,6 +1075,7 @@ export const analysisViewResultSchema = z.discriminatedUnion("kind", [
     artifact: z.null(),
     view: nativeFunctionMatchingViewRequestSchema,
     items: nativeFunctionMatchingViewItemsSchema,
+    byte_limited: z.boolean().optional(),
     parent_operation: z.literal("match_native_functions"),
   }),
   z.strictObject({
