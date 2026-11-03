@@ -96,6 +96,12 @@ export const nativeValueTraceSchema = z.strictObject({
     z.strictObject({
       procedure: z.string(),
       address: z.string().nullable(),
+      related_procedure: z
+        .string()
+        .nullable()
+        .describe(
+          "The exact identity of the other procedure this unknown names: a call destination the depth budget or ambiguous candidates left untraversed, a callee whose parameter bindings or arguments are missing, or a thunk target no path reached; reason restates it for display. null when the unknown names no other procedure.",
+        ),
       reason: z.string(),
     }),
   ),
